@@ -4,4 +4,4 @@
 
 * <https://estebanr.shinyapps.io/covid-interactive-exploration/>
 
-* Made with an `fleshdaxboard` interface.
+* Made with a `fleshdaxboard` interface.
