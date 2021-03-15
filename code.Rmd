@@ -1,0 +1,603 @@
+---
+title: "Coronavirus Interactive Exploration"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    theme: flatly
+    navbar:
+      - { title: "Made by Esteban Rucán", align: right }
+      
+runtime: shiny
+resource_files:
+- datasets/spatial.csv
+---
+
+```{r setup, include=FALSE}
+source('global.R')
+```
+
+Overwatch
+=======================================================================
+
+Column {data-width=300 .sidebar}
+-----------------------------------------------------------------------
+
+
+```{r, fig.align='center'}
+start <- covid_data %>% 
+    pull(date) %>% 
+    min()
+
+end <- covid_data %>% 
+    pull(date) %>% 
+    max()
+
+maximo <- covid_data %>% 
+    pull(location) %>% 
+    unique() %>% 
+    length()
+
+h1('\n\n\n\n\n\n\n\n')
+
+dateRangeInput('date_range_global', strong('Select a Date Range'), start = start, end = end)
+sliderInput('max_countries', strong('Number of Countries'), min = 1, max = maximo, value = 10)
+actionButton('view_over', 'View')
+```
+
+
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Total Cases per Country in Date Range
+
+```{r, fig.align='left'}
+
+cd <- eventReactive(input$view_over, {
+    country_cases(input$date_range_global[1], input$date_range_global[2], input$max_countries)
+})
+
+d3wordcloud::renderD3wordcloud({
+  cd <- cd()
+  
+  d3wordcloud::d3wordcloud(cd$Country,
+                           cd$`Total Cases`,
+                           rotate.min = -15,
+                           rotate.max = 15, 
+                           tooltip = TRUE,
+                           label = cd$Country,
+                           colors = substr(viridis::viridis(input$max_countries), 0 , 7),
+                           font = 'Serif')
+})
+
+```
+
+### Top Countries by Cases per Million
+
+```{r}
+cdm <- eventReactive(input$view_over, {
+    country_cases_pm(input$date_range_global[1], input$date_range_global[2], input$max_countries)
+})
+
+DT::renderDT({
+    cdm <- cdm()
+  
+    cdm %>% 
+        select(Country, Continent, `Total Cases per Million`) %>% 
+        DT::datatable(rownames = FALSE)
+})
+```
+
+
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Top Countries by Cases
+
+```{r}
+DT::renderDT({
+    cd <- cd()
+  
+    cd %>% 
+        select(Country, Continent, `Total Cases`) %>% 
+        DT::datatable(rownames = FALSE)
+})
+```
+
+### Global Accumuled Cases in Date Range
+
+```{r}
+gc <- eventReactive(input$view_over, {
+    global_total_cases(input$date_range_global[1], input$date_range_global[2], input$max_countries)
+})
+
+plotly::renderPlotly({
+    gc() %>% 
+        ggplot(aes(Date, `Accumulated Cases`)) +
+        geom_col(color = 'deepskyblue4',
+                  fill = 'deepskyblue3', alpha = 0.7) +
+        labs(x = 'Date', y = 'Accumuled Cases') +
+        scale_y_continuous(expand = c(0, 0)) +
+        theme_classic()
+})
+```
+
+Map
+=======================================================================
+
+Column {data-width=300 .sidebar}
+-----------------------------------------------------------------------
+
+```{r, fig.align='center'}
+h1('\n\n\n\n\n\n\n\n')
+
+dateRangeInput('date_range_map', strong('Select a Date Range'), start = start, end = end)
+actionButton('view_map', 'View')
+```
+
+
+Column {data-width=1000}
+-----------------------------------------------------------------------
+
+### Interactive Map
+
+```{r, fig.height=9}
+mcd <- eventReactive(input$view_map, {
+    global_summary(input$date_range_map[1], input$date_range_map[2])
+})
+
+renderLeaflet({
+    mc <- mcd()
+    label <- paste0(mc$location, ' - Total Cases: ', prettyNum(mc$total_cases, big.mark = ','),
+                    ' - Positivity Rate: ', prettyNum(mc$positivity, big.mark = ','),
+                    ' - Total Deaths: ', prettyNum(mc$total_deaths, big.mark = ','))
+    radius <- round(mc$total_cases / max(mc$total_cases) * 30)
+    
+    leaflet(options = leafletOptions((minZoom = 2))) %>% 
+        addTiles() %>% 
+        addCircleMarkers(lng = mc$longitude, lat = mc$latitude, radius = radius ,
+                   color = 'red', opacity = 0.5, 
+                   label = label)
+})
+```
+
+Country
+=======================================================================
+
+Column {data-width=300 .sidebar}
+-----------------------------------------------------------------------
+
+```{r, fig.align='center'}
+h1('\n\n\n\n\n\n\n\n')
+
+dateRangeInput('date_range_country', strong('Select a Date Range'), start = start, end = end)
+
+selectInput('s_continent', strong('Select a Continent'), choices = continents, selected = continents[1])
+
+conditionalPanel("input.s_continent == 'Africa'",
+                 selectInput('scountry1', strong('Select a Country'), choices = countries_per_continent$Africa,
+                             selected = countries_per_continent$Africa[1]))
+conditionalPanel("input.s_continent == 'Asia'",
+                 selectInput('scountry2', strong('Select a Country'), choices = countries_per_continent$Asia,
+                             selected = countries_per_continent$Asia[1]))
+conditionalPanel("input.s_continent == 'Europe'",
+                 selectInput('scountry3', strong('Select a Country'), choices = countries_per_continent$Europe,
+                             selected = countries_per_continent$Europe[1]))
+conditionalPanel("input.s_continent == 'North America'",
+                 selectInput('scountry4', strong('Select a Country'), choices = countries_per_continent$`North America`,
+                             selected = countries_per_continent$`North America`[1]))
+conditionalPanel("input.s_continent == 'Oceania'",
+                 selectInput('scountry5', strong('Select a Country'), choices = countries_per_continent$Oceania,
+                             selected = countries_per_continent$Oceania[1]))
+conditionalPanel("input.s_continent == 'South America'",
+                 selectInput('scountry6', strong('Select a Country'), choices = countries_per_continent$`South America`,
+                             selected = countries_per_continent$`South America`[1]))
+
+
+```
+```{r}
+actionButton('view_country', 'View')
+```
+
+
+Column {data-width=290}
+-----------------------------------------------------------------------
+
+```{r}
+cs <- eventReactive(input$view_country, {
+  if (input$s_continent == 'Africa') {
+    data <- country_summary(start = input$date_range_country[1], 
+                            end = input$date_range_country[2],
+                            country = input$scountry1)
+  } else if (input$s_continent == 'Asia') {
+    data <- country_summary(start = input$date_range_country[1], 
+                            end = input$date_range_country[2],
+                            country = input$scountry2)
+    
+  } else if (input$s_continent == 'Europe') {
+    data <- country_summary(start = input$date_range_country[1], 
+                            end = input$date_range_country[2],
+                            country = input$scountry3)
+  } else if (input$s_continent == 'North America') {
+    data <- country_summary(start = input$date_range_country[1], 
+                            end = input$date_range_country[2],
+                            country = input$scountry4) 
+  } else if (input$s_continent == 'Oceania') {
+    data <- country_summary(start = input$date_range_country[1], 
+                            end = input$date_range_country[2],
+                            country = input$scountry5)
+  } else if (input$s_continent == 'South America') {
+    data <- country_summary(start = input$date_range_country[1], 
+                            end = input$date_range_country[2],
+                            country = input$scountry6)
+  }
+    
+    data
+})
+
+integer_breaks <- function(n = 5, ...) {
+  fxn <- function(x) {
+    breaks <- floor(pretty(x, n, ...))
+    names(breaks) <- attr(breaks, "labels")
+    breaks
+  }
+  return(fxn)
+}
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = cs$interval_covid_data$location[1], 
+           caption = 'Country',
+           color = '#808080') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### New Cases in Date Range
+
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, new_cases)) +
+    geom_col(fill = '#0f1955', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'New Cases') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+
+
+
+
+### Accumuled Cases in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, total_cases)) +
+    geom_col(fill = '#0f1955', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'Accumulated Cases') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+
+### Accumuled Deaths in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, total_deaths)) +
+    geom_col(fill = '#104d56', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'Accumuled Deaths') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+
+### Accumuled Tests in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, total_tests)) +
+    geom_col(fill = '#bf8cff', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'Accumuled Tests') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+Column {data-width=290}
+-----------------------------------------------------------------------
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$interval_covid_data$population[1], big.mark = ','), 
+           caption = 'Population',
+           color = '#808080') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### Active Cases in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, total_active)) +
+    geom_col(fill = '#0f1955', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'Active Cases') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+### New Deaths in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, new_deaths)) +
+    geom_col(fill = '#104d56', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'New Deaths') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+
+### New Tests in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, new_tests)) +
+    geom_col(fill = '#bf8cff', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       breaks = integer_breaks()) +
+    labs(x = 'Date', y = 'New Tests') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+
+### Positive Rate in Date Range
+
+```{r}
+renderPlotly({
+  cs()$interval_covid_data %>%
+    ggplot(aes(date, positive_rate)) +
+    geom_line(color = '#368fce', alpha = 0.7) +
+    theme_classic() +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       labels = scales::percent_format()
+                       ) +
+    labs(x = 'Date', y = 'Positive Rate') +
+    scale_x_date(date_labels = "%Y/%m/%d")
+    
+})
+```
+
+
+Column {data-width=120}
+-----------------------------------------------------------------------
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$new_cases, big.mark = ','), 
+           caption = paste0('New cases in ', input$date_range_country[2]),
+           color = '#36479C',
+           icon = 'fa-viruses')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$active_cases, big.mark = ','), 
+           caption = paste0('Active cases in ', input$date_range_country[2]),
+           color = '#36479C') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$cases_pm, big.mark = ','), 
+           caption = paste0('Total cases per million in Date Range'),
+           color = '#36479C') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$total_recovered, big.mark = ','), 
+           caption = paste0('Total recovered in ', input$date_range_country[2]),
+           color = '#36479C') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$total_cases, big.mark = ','), 
+           caption = paste0('Total cases in Data Range'),
+           color = '#36479C') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$last_day_deaths, big.mark = ','), 
+           caption = paste0('New deaths in ', input$date_range_country[2]),
+           color = '#36479C') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$total_death, big.mark = ','), 
+           caption = paste0('Total deaths in Date Range'),
+           color = '#36479C') #,
+           #icon = 'fa-virus')
+
+})
+```
+
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$total_test, big.mark = ','), 
+           caption = paste0('Total tests in Date Range'),
+           color = '#8ec3a7') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = ifelse(is.infinite(cs$total_positivity), 
+                          'No data',
+                          paste0(cs$total_positivity, '%')), 
+           caption = paste0('Positive rate in Date Range'),
+           color = '#8ec3a7') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = prettyNum(cs$test_last_day, big.mark = ','), 
+           caption = paste0('New tests in ', input$date_range_country[2]),
+           color = '#8ec3a7') #,
+           #icon = 'fo-virus')
+
+})
+```
+
+### $\,$
+
+```{r}
+renderValueBox({
+  cs <- cs()
+
+  
+  valueBox(value = ifelse(is.infinite(cs$positivity_last_day), 
+                          'No data',
+                          paste0(cs$positivity_last_day, '%')), 
+           caption = paste0('Positive rate in ', input$date_range_country[2]),
+           color = '#8ec3a7') #,
+           #icon = 'fo-virus')
+
+})
+```
