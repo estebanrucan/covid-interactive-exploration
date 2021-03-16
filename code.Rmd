@@ -6,11 +6,13 @@ output:
     vertical_layout: scroll
     theme: flatly
     navbar:
-      - { title: "Made by Esteban Rucán", align: right }
-      
+    - title: Made by Esteban Rucán
+      align: right
 runtime: shiny
 resource_files:
 - datasets/spatial.csv
+- datasets/date.csv
+- datasets/owid-covid-data.csv
 ---
 
 ```{r setup, include=FALSE}
@@ -43,6 +45,8 @@ h1('\n\n\n\n\n\n\n\n')
 dateRangeInput('date_range_global', strong('Select a Date Range'), start = start, end = end)
 sliderInput('max_countries', strong('Number of Countries'), min = 1, max = maximo, value = 10)
 actionButton('view_over', 'View')
+
+tags$footer(HTML(paste0("<footer><small><b>Updated ", time_since_last_commit, " hours ago.</b></small></footer>")), align = "left", style = "position:absolute; bottom:0; width:95%; height:50px; color: #000000; padding: 0px; background-color: transparent; z-index: 1000;")
 ```
 
 
@@ -135,6 +139,8 @@ h1('\n\n\n\n\n\n\n\n')
 
 dateRangeInput('date_range_map', strong('Select a Date Range'), start = start, end = end)
 actionButton('view_map', 'View')
+
+tags$footer(HTML(paste0("<footer><small><b>Updated ", time_since_last_commit, " hours ago.</b></small></footer>")), align = "left", style = "position:absolute; bottom:0; width:95%; height:50px; color: #000000; padding: 0px; background-color: transparent; z-index: 1000;")
 ```
 
 
@@ -199,6 +205,8 @@ conditionalPanel("input.s_continent == 'South America'",
 ```
 ```{r}
 actionButton('view_country', 'View')
+
+tags$footer(HTML(paste0("<footer><small><b>Updated ", time_since_last_commit, " hours ago.</b></small></footer>")), align = "left", style = "position:absolute; bottom:0; width:95%; height:50px; color: #000000; padding: 0px; background-color: transparent; z-index: 1000;")
 ```
 
 

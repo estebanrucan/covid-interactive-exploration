@@ -10,13 +10,40 @@ require(ggrepel)
 require(slider)
 require(plotly)
 require(scales)
+require(rvest)
+require(httr)
 
 
 
 # load data ---------------------------------------------------------------
 
+page <- GET('https://github.com/owid/covid-19-data/commits/master/public/data/owid-covid-data.csv',
+            user_agent('Esteban :)'))
 
-covid_data <- read_csv('https://covid.ourworldindata.org/data/owid-covid-data.csv')
+
+
+dates <- page %>% 
+    content() %>% 
+    html_nodes('relative-time.no-wrap') %>% 
+    html_attr('datetime') %>%
+    as_datetime()
+
+last_commit <- dates[1]
+
+last_update <- read_csv(file.path('datasets', 'date.csv')) %>% pull(date)
+
+current_time <- Sys.time() %>% with_tz('UTC') 
+
+time_since_last_commit <- interval(last_commit, current_time) %/% hours(1)
+
+if (last_update < last_commit) {
+    covid_data <- read_csv('https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/owid-covid-data.csv')
+    write.csv(covid_data, file = file.path('datasets', 'owid-covid-data.csv'))
+    write.csv(last_commit %>% tibble(date = .), file = file.path('datasets', 'date.csv'))
+} else {
+    covid_data <- read_csv(file.path('datasets', 'owid-covid-data.csv'))
+}
+
 coordinates <- read_csv(file.path('datasets', 'spatial.csv'))
 
 coordinates %<>% 
@@ -231,4 +258,7 @@ country_summary <- function(start, end, country) {
         ))
     
 }
+
+
+
 
