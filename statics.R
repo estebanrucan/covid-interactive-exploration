@@ -1,8 +1,3 @@
-continents <- covid_data %>% 
-    pull(continent) %>% 
-    unique() %>% 
-    sort()
-
 countries_per_continent <- covid_data %>% 
     arrange(continent) %>% 
     group_by(continent) %>% 
@@ -20,16 +15,13 @@ country_cases <- function(start, end, top) {
     covid_data %>%
         filter(between(date, as.Date(start), as.Date(end))) %>% 
         replace_na(list(new_cases = 0)) %>%
-        left_join(coordinates, by = 'iso_code') %>% 
         group_by(continent, location) %>% 
-        summarise(cases = sum(new_cases),
-                  mean_cases = mean(new_cases)) %>% 
+        summarise(cases = sum(new_cases)) %>% 
         arrange(desc(cases)) %>% 
         head(top) %>% 
         rename('Total Cases' = cases,
                'Country' = location,
-               Continent = continent,
-               'Mean Cases' = mean_cases)
+               Continent = continent)
     
 }
 
@@ -75,14 +67,13 @@ global_summary <- function(start, end) {
         filter(between(date, as.Date(start), as.Date(end))) %>% 
         replace_na(list(new_cases = 0, new_deaths = 0, new_tests = 0)) %>%
         group_by(location) %>% 
-        summarise(total_cases = sum(new_cases),
+        summarise(total_cases  = sum(new_cases),
                   total_deaths = sum(new_deaths),
-                  positivity = round(sum(new_cases) / sum(new_tests) * 100)) %>% 
+                  positivity   = round(sum(new_cases) / sum(new_tests) * 100)) %>% 
         left_join(covid_data %>% 
-                      select(location, iso_code) %>% 
-                      distinct(), by = 'location')  %>% 
-        select(iso_code, location, total_cases, total_deaths, positivity, latitide,
-               longitude, min_lat, min_lon, max_lat, max_lon)
+                      select(iso_code, location, latitude,
+                             longitude) %>% 
+                      distinct(), by = 'location')
 }
 
 
@@ -174,3 +165,42 @@ country_coord <- function(country) {
         left_join(coordinates, by = 'iso_code') %>% 
         select(longitude, latitude)
 }
+
+integer_breaks <- function(n = 5, ...) {
+    fxn <- function(x) {
+        breaks <- floor(pretty(x, n, ...))
+        names(breaks) <- attr(breaks, "labels")
+        breaks
+    }
+    return(fxn)
+}
+
+bound_limits <- function(name) {
+    
+    covid_data %>%
+        select(location, min_lon, min_lat, max_lon, max_lat) %>%
+        bind_rows(
+            tibble(
+                location = continents,
+                min_lon = c(-23.906250, 18.808594, -13.535156, -169.453125, 101.865234, -100.019531),
+                min_lat = c(-36.456636, 1.406109, 34.452218, 15.961329, -51.563412, -57.421294),
+                max_lon = c(53.964844, 190.898438, 42.890625, -52.734375, 180, -26.015625),
+                max_lat = c(38.134557, 76.800739, 70.080562, 73.627789, -4.565474, 13.239945)
+            )
+        ) %>%
+        bind_rows(
+            tibble(
+                location = 'Worldwide',
+                min_lon  = -175,
+                max_lon  = 175,
+                min_lat  = -90,
+                max_lat  = 90
+            )
+        ) %>% 
+        filter(location == name) %>% 
+        distinct() %>% 
+        mutate(latitude = mean(c(min_lat, max_lat)),
+               longitude = mean(c(min_lon, max_lon)))
+        
+}
+

@@ -5,8 +5,8 @@ account: estebanr
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3800264
-bundleId: 4353591
+bundleId: 4364064
 url: https://estebanr.shinyapps.io/covid-interactive-exploration/
-when: 1615909786.26309
+when: 1616079055.71217
 asMultiple: FALSE
 asStatic: FALSE
