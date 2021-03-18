@@ -16,6 +16,7 @@ resource_files:
 ---
 
 ```{r setup, include=FALSE}
+load(file.path('datasets', 'statics.RData'))
 source('global.R')
 ```
 
@@ -114,7 +115,7 @@ DT::renderDT({
 
 ```{r}
 gc <- eventReactive(input$view_over, {
-    global_total_cases(input$date_range_global[1], input$date_range_global[2], input$max_countries)
+    global_total_cases(input$date_range_global[1], input$date_range_global[2])
 })
 
 plotly::renderPlotly({
@@ -138,10 +139,21 @@ Column {data-width=300 .sidebar}
 h1('\n\n\n\n\n\n\n\n')
 
 dateRangeInput('date_range_map', strong('Select a Date Range'), start = start, end = end)
-actionButton('view_map', 'View')
+radioButtons('radio_map_center', strong('Center in'), 
+             choices = c('Worldwide', 'Continent', 'Country'), 
+             selected = 'Worldwide')
 
+conditionalPanel("input.radio_map_center == 'Worldwide'", NA)
+conditionalPanel("input.radio_map_center == 'Continent'", )
+
+
+actionButton('view_map', 'View')
+```
+
+```{r}
 tags$footer(HTML(paste0("<footer><small><b>Updated ", time_since_last_commit, " hours ago.</b></small></footer>")), align = "left", style = "position:absolute; bottom:0; width:95%; height:50px; color: #000000; padding: 0px; background-color: transparent; z-index: 1000;")
 ```
+
 
 
 Column {data-width=1000}
