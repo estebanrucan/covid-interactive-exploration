@@ -7,18 +7,17 @@ countries_per_continent <- covid_data %>%
                                unique() %>% 
                                sort())) %>% 
     pull(countries) %>% 
-    set_names(continents) 
+    set_names(continents)
 
 # each country cases ------------------------------------------------------
 
-country_cases <- function(start, end, top) {
+country_cases <- function(start, end) {
     covid_data %>%
         filter(between(date, as.Date(start), as.Date(end))) %>% 
         replace_na(list(new_cases = 0)) %>%
         group_by(continent, location) %>% 
         summarise(cases = sum(new_cases)) %>% 
         arrange(desc(cases)) %>% 
-        head(top) %>% 
         rename('Total Cases' = cases,
                'Country' = location,
                Continent = continent)
@@ -26,7 +25,7 @@ country_cases <- function(start, end, top) {
 }
 
 
-country_cases_pm <- function(start, end, top) {
+country_cases_pm <- function(start, end) {
     covid_data %>%
         filter(between(date, as.Date(start), as.Date(end))) %>% 
         replace_na(list(new_cases = 0)) %>%
@@ -34,7 +33,6 @@ country_cases_pm <- function(start, end, top) {
         summarise(cases = sum(new_cases),
                   cases_per_million = round(cases / max(population) * 1e+6)) %>% 
         arrange(desc(cases_per_million)) %>% 
-        head(top) %>% 
         rename('Total Cases' = cases,
                'Country' = location,
                Continent = continent,
@@ -204,3 +202,50 @@ bound_limits <- function(name) {
         
 }
 
+evolution_of_cases <- function(start, end) {
+    
+    start <- as.Date(start)
+    end   <- as.Date(end)
+    
+    dates <- start + 0:(interval(start, end) %/% days(1))
+    
+    dates_location <- tibble(
+        date = rep(dates, rep(length(continents), length(dates))),
+        continent = rep(continents, length(dates))) %>% 
+        filter(between(date, start, end)) %>% 
+        mutate(week = interval(start, date) %/% weeks(1) + 1) %>%
+        mutate(paste_loc = paste0(week, continent)) %>%
+        group_by(week, continent, paste_loc) %>% 
+        summarise(date = max(date),
+                  .groups = 'drop')
+    
+    covid_data %>% 
+        filter(between(date, start, end)) %>% 
+        select(date, continent, location, new_cases, new_deaths) %>%
+        arrange(date, continent) %>% 
+        mutate(week = interval(start, date) %/% weeks(1)) %>%
+        group_by(week, continent) %>% 
+        summarise(total_cases  = sum(new_cases),
+                  total_deaths = sum(new_deaths),
+                  .groups = 'drop') %>%
+        ungroup() %>% 
+        group_by(continent) %>% 
+        arrange(total_cases, total_deaths, .by_group = TRUE) %>% 
+        ungroup() %>% 
+        mutate(paste_loc = paste0(week, continent)) %>%
+        right_join(dates_location, by = 'paste_loc') %>% 
+        select(week = week.y, 
+               continent = continent.y, 
+               total_cases,
+               total_deaths,
+               date) %>% 
+        arrange(week, continent) %>%
+        replace_na(list(total_cases = 1, 
+                        total_deaths = 1)) %>% 
+        group_by(week) %>% 
+        mutate(ranking = row_number(desc(total_cases))) %>%
+        ungroup() %>%
+        mutate(group = factor(ranking,
+                              labels = c('1th', '2nd', '3rd', '4th', '5th', '6th'))) %>% 
+        arrange(week, continent)
+}

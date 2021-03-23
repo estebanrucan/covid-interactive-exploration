@@ -12,6 +12,10 @@ suppressPackageStartupMessages(require(plotly))
 suppressPackageStartupMessages(require(scales))
 suppressPackageStartupMessages(require(rvest))
 suppressPackageStartupMessages(require(httr))
+suppressPackageStartupMessages(require(gganimate))
+suppressPackageStartupMessages(require(ggflags))
+suppressPackageStartupMessages(require(av))
+
 
 # Checking commits -------------------------------------------------------------
 
