@@ -60,19 +60,42 @@ global_total_cases <- function(start, end) {
 # map ---------------------------------------------------------------------
 
 
-global_summary <- function(start, end) {
-    covid_data %>%
+global_summary <- function(start, end, maps) {
+    gs <- covid_data %>%
         filter(between(date, as.Date(start), as.Date(end))) %>% 
-        replace_na(list(new_cases = 0, new_deaths = 0, new_tests = 0)) %>%
+        replace_na(list(new_cases  = 0,
+                        new_deaths = 0, 
+                        new_tests  = 0)) %>%
         group_by(location) %>% 
         summarise(total_cases  = sum(new_cases),
                   total_deaths = sum(new_deaths),
-                  positivity   = round(sum(new_cases) / sum(new_tests) * 100)) %>% 
-        left_join(covid_data %>% 
-                      select(iso_code, location, latitude,
-                             longitude) %>% 
-                      distinct(), by = 'location')
+                  positivity   = round(sum(new_cases) / sum(new_tests) * 100, 2),
+                  cases_pm     = round(total_cases / max(population) * 1e+6),
+                  deaths_pm    = round(total_deaths / max(population) * 1e+6),
+                  .groups = 'drop') %>% 
+        ungroup() %>% 
+        left_join(covid_data %>% select(iso_code, location, population) %>% distinct(), 
+                  by = 'location')
+    
+    maps@data  %<>% 
+        left_join(gs, by = c('ISO_A3' = 'iso_code')) %>% 
+        select(-ADMIN) %>% 
+        rename(iso_code = ISO_A3) %>% 
+        replace_na(list(total_cases  = 0,
+                        total_deaths = 0,
+                        positivity   = 0,
+                        cases_pm     = 0,
+                        deaths_pm    = 0)) %>% 
+        mutate(total_cases = if_else(total_cases == 0, 1, total_cases))
+    
+    maps
 }
+
+
+
+
+# Country ----------------------------------------------------------------------
+
 
 
 country_summary <- function(start, end, country) {
@@ -249,3 +272,5 @@ evolution_of_cases <- function(start, end) {
                               labels = c('1th', '2nd', '3rd', '4th', '5th', '6th'))) %>% 
         arrange(week, continent)
 }
+
+load(file.path('datasets', 'countries.RData'))

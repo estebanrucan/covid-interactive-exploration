@@ -1,13 +1,22 @@
 ---
-title: 'Coronavirus Interactive Exploration'
+title: "Coronavirus Interactive Exploration"
 output:
   flexdashboard::flex_dashboard:
     orientation: columns
     vertical_layout: scroll
     theme: flatly
     navbar:
-    - {title: 'Made by Esteban Rucán', href: 'https://github.com/estebanrucan', align: right}
+    - title: Made by Esteban Rucán
+      href: https://github.com/estebanrucan
+      align: right
 runtime: shiny
+resource_files:
+- datasets/coordinates.RDS
+- datasets/date.RDS
+- datasets/owid-covid-data.csv
+- datasets/owid-covid-data.RDS
+- codes/global.R
+- codes/statics.RData
 ---
 
 ```{r setup, include=FALSE}
@@ -97,62 +106,6 @@ Column {data-width=300 .sidebar}
 h1("\n\n\n\n\n\n\n\n")
 
 dateRangeInput("date_range_map", strong("Date Range"), start = as.Date("2020-01-01"), end = end)
-radioButtons("radio_map_center", strong("Focus in"),
-  choices = c("Worldwide", "Continent", "Country"),
-  selected = "Worldwide"
-)
-
-conditionalPanel(
-  "input.radio_map_center == 'Continent'",
-  selectInput("output_continent", strong("Continent"), choices = continents, selected = continents[1])
-)
-
-conditionalPanel(
-  "input.radio_map_center == 'Country'",
-  selectInput("m_continent", strong("Continent"), choices = continents, selected = continents[1]),
-  conditionalPanel(
-    "input.m_continent == 'Africa'",
-    selectInput("mcountry1", strong("Country"),
-      choices = countries_per_continent$Africa,
-      selected = countries_per_continent$Africa[1]
-    )
-  ),
-  conditionalPanel(
-    "input.m_continent == 'Asia'",
-    selectInput("mcountry2", strong("Country"),
-      choices = countries_per_continent$Asia,
-      selected = countries_per_continent$Asia[1]
-    )
-  ),
-  conditionalPanel(
-    "input.m_continent == 'Europe'",
-    selectInput("mcountry3", strong("Country"),
-      choices = countries_per_continent$Europe,
-      selected = countries_per_continent$Europe[1]
-    )
-  ),
-  conditionalPanel(
-    "input.m_continent == 'North America'",
-    selectInput("mcountry4", strong("Country"),
-      choices = countries_per_continent$`North America`,
-      selected = countries_per_continent$`North America`[1]
-    )
-  ),
-  conditionalPanel(
-    "input.m_continent == 'Oceania'",
-    selectInput("mcountry5", strong("Country"),
-      choices = countries_per_continent$Oceania,
-      selected = countries_per_continent$Oceania[1]
-    )
-  ),
-  conditionalPanel(
-    "input.m_continent == 'South America'",
-    selectInput("mcountry6", strong("Country"),
-      choices = countries_per_continent$`South America`,
-      selected = countries_per_continent$`South America`[1]
-    )
-  )
-)
 
 actionButton("view_map", "View")
 ```
@@ -172,59 +125,40 @@ Column {data-width=1000}
 ```{r, fig.height=9}
 
 mcd <- eventReactive(input$view_map, {
-  global_summary(input$date_range_map[1], input$date_range_map[2])
-})
-
-
-ms <- eventReactive(input$view_map, {
-  if (input$radio_map_center == "Worldwide") {
-    data <- bound_limits("Worldwide")
-  } else if (input$radio_map_center == "Continent") {
-    data <- bound_limits(input$output_continent)
-  } else if (input$radio_map_center == "Country") {
-    if (input$m_continent == "Africa") {
-      data <- bound_limits(input$mcountry1)
-    } else if (input$m_continent == "Asia") {
-      data <- bound_limits(input$mcountry2)
-    } else if (input$m_continent == "Europe") {
-      data <- bound_limits(input$mcountry3)
-    } else if (input$m_continent == "North America") {
-      data <- bound_limits(input$mcountry4)
-    } else if (input$m_continent == "Oceania") {
-      data <- bound_limits(input$mcountry5)
-    } else if (input$m_continent == "South America") {
-      data <- bound_limits(input$mcountry6)
-    }
-  }
-  data
+  global_summary(input$date_range_map[1], input$date_range_map[2], maps)
 })
 
 renderLeaflet({
-  mc <- mcd()
-  ms <- ms()
-  label <- paste0(
-    mc$location, " - Total Cases: ", prettyNum(mc$total_cases, big.mark = ","),
-    " - Positive Rate: ", prettyNum(mc$positivity, big.mark = ","),
-    "% - Total Deaths: ", prettyNum(mc$total_deaths, big.mark = ",")
-  )
-  radius <- round(mc$total_cases / max(mc$total_cases) * 45)
+  maps2 <- mcd()
 
-  leaflet(options = leafletOptions(minZoom = 2)) %>%
-    addProviderTiles(providers$CartoDB.DarkMatter) %>%
-    addCircleMarkers(
-      lng = mc$longitude,
-      lat = mc$latitude,
-      radius = radius,
-      color = "#a006e5",
-      opacity = 0.7,
-      label = label
-    ) %>%
-    flyToBounds(
-      lng1 = ms$min_lon,
-      lng2 = ms$max_lon,
-      lat1 = ms$min_lat,
-      lat2 = ms$max_lat
-    )
+pal <- colorNumeric(palette = 'Blues',
+                    domain = log10(maps2@data$total_cases))
+
+label <- paste0(
+    '<b>Country: ', maps2$location, 
+    '</b><br/>- Population:', ifelse(is.na(maps2$population), 'No info', prettyNum(maps2$population, big.mark = ",")),
+    '<br/>- Total Cases: ', ifelse(maps2$total_cases == 1, 0, prettyNum(maps2$total_cases, big.mark = ",")),
+    '<br/>- Total Deaths: ', prettyNum(maps2$total_deaths, big.mark = ','),
+    '<br/>- Positive Rate: ', ifelse(is.infinite(maps2$positivity), 'No info', paste0(prettyNum(maps2$positivity, big.mark = ','), '%')),
+    '<br/>- Total Cases per Millon: ', prettyNum(maps2$cases_pm, big.mark = ","),
+    '<br/>- Total Deaths per Millon: ', prettyNum(maps2$deaths_pm, big.mark = ",")
+)
+
+maps2 %>% 
+    leaflet(options = leafletOptions(minZoom = 2)) %>%
+    addProviderTiles('CartoDB') %>%
+    addSearchOSM() %>%
+    addResetMapButton() %>% 
+    addPolygons(weight      = 1, 
+                color       = ~ pal(log10(total_cases)), 
+                fillOpacity = 1,
+                popup       = ~ label,
+                highlightOptions = highlightOptions(
+                    weight       = 5, 
+                    color        = "white",
+                    bringToFront = TRUE
+                ))
+
 })
 ```
 

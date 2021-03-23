@@ -12,9 +12,7 @@ suppressPackageStartupMessages(require(plotly))
 suppressPackageStartupMessages(require(scales))
 suppressPackageStartupMessages(require(rvest))
 suppressPackageStartupMessages(require(httr))
-suppressPackageStartupMessages(require(gganimate))
-suppressPackageStartupMessages(require(ggflags))
-suppressPackageStartupMessages(require(av))
+suppressPackageStartupMessages(require(leaflet.extras))
 
 
 # Checking commits -------------------------------------------------------------
@@ -62,7 +60,8 @@ covid_data %<>%
                     total_cases   = 0, 
                     total_tests   = 0)) %>% 
     group_by(location) %>% 
-    summarise(total_active = slide_dbl(new_cases, sum, .before = 14, .after = 0, .complete = FALSE)) %>% 
+    summarise(total_active = slide_dbl(new_cases, sum, .before = 11, .after = 0, .complete = FALSE),
+              .groups = 'drop') %>% 
     replace_na(list(total_active = 0, 
                     total_cases  = 0, 
                     total_deaths = 0)) %>% 
