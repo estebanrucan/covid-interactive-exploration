@@ -225,52 +225,35 @@ bound_limits <- function(name) {
         
 }
 
-evolution_of_cases <- function(start, end) {
-    
-    start <- as.Date(start)
-    end   <- as.Date(end)
-    
-    dates <- start + 0:(interval(start, end) %/% days(1))
-    
-    dates_location <- tibble(
-        date = rep(dates, rep(length(continents), length(dates))),
-        continent = rep(continents, length(dates))) %>% 
-        filter(between(date, start, end)) %>% 
-        mutate(week = interval(start, date) %/% weeks(1) + 1) %>%
-        mutate(paste_loc = paste0(week, continent)) %>%
-        group_by(week, continent, paste_loc) %>% 
-        summarise(date = max(date),
-                  .groups = 'drop')
+evolution_of_cases <- function() {
     
     covid_data %>% 
-        filter(between(date, start, end)) %>% 
-        select(date, continent, location, new_cases, new_deaths) %>%
-        arrange(date, continent) %>% 
-        mutate(week = interval(start, date) %/% weeks(1)) %>%
-        group_by(week, continent) %>% 
-        summarise(total_cases  = sum(new_cases),
-                  total_deaths = sum(new_deaths),
-                  .groups = 'drop') %>%
+        filter(!is.na(continent)) %>% 
+        select(date, location, continent, new_cases) %>% 
+        group_by(date, continent) %>% 
+        summarise(new_cases = sum(new_cases, na.rm = TRUE),
+                  .groups = 'drop') %>% 
         ungroup() %>% 
+        group_by(week = interval(min(date, na.rm = TRUE), date) %/% weeks(1), continent) %>% 
+        summarise(new_cases = sum(new_cases, na.rm = TRUE),
+                  date = max(date, na.rm = TRUE),
+                  .groups = 'drop') %>% 
+        ungroup() %>% 
+        complete(week, continent, fill = list(new_cases = 0)) %>%
         group_by(continent) %>% 
-        arrange(total_cases, total_deaths, .by_group = TRUE) %>% 
+        mutate(last_month_new_cases = slide_dbl(new_cases,
+                                                ~sum(.x, na.rm = TRUE),
+                                                .before = 4, 
+                                                .after = 0, 
+                                                .complete = TRUE)) %>%
         ungroup() %>% 
-        mutate(paste_loc = paste0(week, continent)) %>%
-        right_join(dates_location, by = 'paste_loc') %>% 
-        select(week = week.y, 
-               continent = continent.y, 
-               total_cases,
-               total_deaths,
-               date) %>% 
-        arrange(week, continent) %>%
-        replace_na(list(total_cases = 1, 
-                        total_deaths = 1)) %>% 
         group_by(week) %>% 
-        mutate(ranking = row_number(desc(total_cases))) %>%
-        ungroup() %>%
-        mutate(group = factor(ranking,
-                              labels = c('1th', '2nd', '3rd', '4th', '5th', '6th'))) %>% 
-        arrange(week, continent)
+        mutate(date = max(date, na.rm = TRUE)) %>% 
+        ungroup() %>% 
+        replace_na(list(new_cases = 0,
+                        last_month_new_cases = 0)) %>% 
+        filter(week != max(week))
+    
 }
 
 load(file.path('datasets', 'countries.RData'))

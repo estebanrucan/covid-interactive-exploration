@@ -1,5 +1,5 @@
 ---
-title: "Coronavirus Interactive Exploration"
+title: "Covid Interactive Exploration"
 output:
   flexdashboard::flex_dashboard:
     orientation: columns
@@ -37,22 +37,35 @@ Overwatch
 Column {data-width=500}
 -----------------------------------------------------------------------
 
-### Total Cases per Continent Over the Time
+### New cases in last week per continent Over the Time
 
 ```{r}
-plot <- evolution_of_cases('2020-01-01', today) %>%
-    ggplot(aes(date, total_cases, color = continent)) +
-    geom_line() +
-    theme_classic() +
-    labs(
-        x        = 'Date',
-        y        = 'Total Cases'
-    ) +
-    guides(color = guide_legend('Continent')) 
-
-plot %>% 
-  plotly::ggplotly() %>% 
-  rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
+evolution_of_cases() %>%
+    group_by(continent) %>% 
+    e_charts(date) %>%
+    e_line(new_cases) %>% 
+    e_animation(duration = 15000) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'New cases in a week') %>% 
+    e_legend(bottom = '20') %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = -5
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+           splitArea = list(show = FALSE),
+           axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
 ```
 
 
@@ -61,28 +74,42 @@ plot %>%
 ```{r}
 country_cases('2020-01-01', today) %>% 
     select(Country, Continent, `Total Cases`) %>%
-    DT::datatable(rownames = FALSE)
+    reactable::reactable(rownames = FALSE)
 ```
 
 
 Column {data-width=500}
 -----------------------------------------------------------------------
 
-### Global Accumuled Cases
+### ### New cases in last month per continent Over the Time
 
 ```{r}
-gc <- global_total_cases('2020-01-01', today) %>% 
-    ggplot(aes(Date, `Accumulated Cases`)) +
-    geom_col(
-      color = "deepskyblue4",
-      fill = "deepskyblue3", alpha = 0.7
-    ) +
-    labs(x = "Date", y = "Accumuled Cases") +
-    scale_y_continuous(expand = c(0, 0)) +
-    theme_classic()
-
-plotly::ggplotly(gc) %>% 
-  rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
+evolution_of_cases() %>%
+    group_by(continent) %>% 
+    e_charts(date) %>%
+    e_line(last_month_new_cases) %>% 
+    e_animation(duration = 15000) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'New cases in last week') %>% 
+    e_legend(bottom = '20') %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = -5
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+           splitArea = list(show = FALSE),
+           axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
 ```
 
 
@@ -91,7 +118,7 @@ plotly::ggplotly(gc) %>%
 ```{r}
 country_cases_pm('2020-01-01', today) %>% 
     select(Country, Continent, `Total Cases per Million`) %>%
-    DT::datatable(rownames = FALSE)
+    reactable::reactable(rownames = FALSE)
 ```
 
 
@@ -292,23 +319,36 @@ renderValueBox({
 
 
 ```{r}
-renderPlotly({
-  p7 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, new_cases)) +
-    geom_col(fill = "#0f1955", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "New Cases") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p7 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('New Cases' = new_cases) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('New Cases',
+           itemStyle = list(color = '#0f1955',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'New Cases') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 
@@ -318,69 +358,108 @@ renderPlotly({
 ### Accumuled Cases in Date Range
 
 ```{r}
-renderPlotly({
-  p7 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, total_cases)) +
-    geom_col(fill = "#0f1955", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "Accumulated Cases") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p7 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('Total Cases' = total_cases) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('Total Cases',
+           itemStyle = list(color = '#0f1955',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'Total Cases') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 
 ### Accumuled Deaths in Date Range
 
 ```{r}
-renderPlotly({
-  p1 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, total_deaths)) +
-    geom_col(fill = "#104d56", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "Accumuled Deaths") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p1 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('Total Deaths' = total_deaths) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('Total Deaths',
+           itemStyle = list(color = '#000000',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'Total Deaths') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 
 ### Accumuled Tests in Date Range
 
 ```{r}
-renderPlotly({
-  p2 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, total_tests)) +
-    geom_col(fill = "#bf8cff", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "Accumuled Tests") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p2 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('Total Tests' = total_tests,
+           itemStyle = list(color = '#bf8cff',
+                            opacity = 0.7)) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('Total Tests') %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'Total Tests') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 Column {data-width=290}
@@ -405,93 +484,144 @@ renderValueBox({
 ### Active Cases in Date Range
 
 ```{r}
-renderPlotly({
-  
-  p3 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, total_active)) +
-    geom_col(fill = "#0f1955", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "Active Cases") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p3 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('Total Active' = total_active) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('Total Active',
+           itemStyle = list(color = '#0f1955',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'Total Active') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 ### New Deaths in Date Range
 
 ```{r}
-renderPlotly({
-  p4 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, new_deaths)) +
-    geom_col(fill = "#104d56", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "New Deaths") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p4 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-  
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('New Deaths' = new_deaths) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('New Deaths',
+           itemStyle = list(color = '#000000',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'New Deaths') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 
 ### New Tests in Date Range
 
 ```{r}
-renderPlotly({
-  p5 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, new_tests)) +
-    geom_col(fill = "#bf8cff", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      breaks = integer_breaks()
-    ) +
-    labs(x = "Date", y = "New Tests") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p5 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('New Tests' = new_tests) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('New Tests',
+           itemStyle = list(color = '#bf8cff',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'New Tests') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 
 ### Positive Rate in Date Range
 
 ```{r}
-renderPlotly({
-  p6 <- cs()$interval_covid_data %>%
-    ggplot(aes(date, positive_rate)) +
-    geom_line(color = "#368fce", alpha = 0.7) +
-    theme_classic() +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(
-      expand = c(0, 0),
-      labels = scales::percent_format()
-    ) +
-    labs(x = "Date", y = "Positive Rate") +
-    scale_x_date(date_labels = "%Y/%m/%d")
-  
-  p6 %>% 
-    ggplotly() %>% 
-      rangeslider(.[["x"]][["layout"]][["xaxis"]][["range"]][1], .[["x"]][["layout"]][["xaxis"]][["range"]][2])
-})
+renderEcharts4r({
+  cs()$interval_covid_data %>% 
+    rename('Positive Rate' = positive_rate) %>% 
+    e_charts(x = date) %>% 
+    e_line_('Positive Rate',
+           lineStyle = list(color = '#368fce',
+                            opacity = 0.7)) %>% 
+    e_tooltip(trigger = 'axis') %>% 
+    e_axis_labels(x = 'Date',
+                  y = 'Positive Rate') %>% 
+    e_legend(show = FALSE) %>% 
+    e_toolbox_feature("dataZoom") %>%
+    e_toolbox_feature(feature = "reset") %>%
+    e_toolbox_feature("dataView") %>%
+    e_toolbox_feature("saveAsImage") %>% 
+    e_datazoom(
+        type = "slider", 
+        toolbox = FALSE,
+        bottom = 12
+    ) %>% 
+    e_x_axis(nameLocation = "center", 
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0)) %>% 
+    e_y_axis(nameLocation = "center", 
+             position = 'right',
+             splitArea = list(show = FALSE),
+             axisLabel = list(margin = 0),
+             formatter = e_axis_formatter('percent', digits = 2)) %>% 
+    e_theme_custom('codes//walden.project.json')
+}
+)
 ```
 
 

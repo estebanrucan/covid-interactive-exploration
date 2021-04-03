@@ -1,18 +1,18 @@
-suppressPackageStartupMessages(require(tidyverse))
-suppressPackageStartupMessages(require(shiny))
-suppressPackageStartupMessages(require(flexdashboard))
-suppressPackageStartupMessages(require(magrittr))
-suppressPackageStartupMessages(require(lubridate))
-suppressPackageStartupMessages(require(purrr))
-suppressPackageStartupMessages(require(janitor))
-suppressPackageStartupMessages(require(leaflet))
-suppressPackageStartupMessages(require(ggrepel))
-suppressPackageStartupMessages(require(slider))
-suppressPackageStartupMessages(require(plotly))
-suppressPackageStartupMessages(require(scales))
-suppressPackageStartupMessages(require(rvest))
-suppressPackageStartupMessages(require(httr))
-suppressPackageStartupMessages(require(leaflet.extras))
+pacman::p_load(tidyverse, 
+               shiny,
+               flexdashboard,
+               magrittr,
+               lubridate, 
+               janitor,
+               leaflet, 
+               slider,
+               scales,
+               rvest,
+               httr,
+               leaflet.extras,
+               sp, 
+               echarts4r)
+
 
 
 # Checking commits -------------------------------------------------------------
@@ -85,3 +85,5 @@ continents <- covid_data %>%
     pull(continent) %>% 
     unique() %>% 
     sort()
+
+e_common(font_family = "helvetica")

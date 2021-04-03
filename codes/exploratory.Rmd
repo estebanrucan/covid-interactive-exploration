@@ -1,0 +1,347 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+```{r eval=FALSE}
+dates <- ymd('2020-01-01') + weeks(0:53)
+countries <- unlist(countries_per_continent) %>% sort()
+
+base_df <- tibble(
+    date = rep(dates, rep(length(countries), length(dates))),
+    location = rep(countries, length(dates))
+) %>%
+    filter(year(date) == 2020) %>%
+    mutate(week = week(date)) %>%
+    select(week, location) %>%
+    left_join(covid_data %>% select(location, continent, population) %>% distinct(),
+              by = 'location') %>%
+    drop_na()
+
+df <- covid_data %>%
+    filter(lubridate::year(date) == 2020) %>%
+    replace_na(list(new_cases = 0,
+                    new_deaths = 0,
+                    new_tests = 0)) %>%
+    group_by(week = week(date),
+             location, continent, population) %>%
+    summarise(new_cases = sum(new_cases),
+              positive_rate = round(sum(new_cases) / sum(new_tests), 2),
+              new_deaths = sum(new_deaths),
+              .groups = 'drop')
+
+evolution <- base_df %>%
+    left_join(df, by = c('week', 'location')) %>%
+    select(week,
+           location,
+           continent = continent.x,
+           population = population.x,
+           new_cases,
+           positive_rate,
+           new_deaths) %>%
+    replace_na(list(new_cases = 0,
+                    positive_rate = 0,
+                    new_deaths = 0)) %>%
+    group_by(location, continent, population) %>%
+    mutate(positive_rate = if_else(is.infinite(positive_rate), 0, positive_rate),
+           total_deaths = slide_dbl(new_deaths, sum, .before = Inf, .after = 0, .complete = FALSE),
+           total_cases = slide_dbl(new_cases, sum,.before = Inf, .after = 0, .complete = FALSE),
+           cases_pm = round(total_cases / population * 1e+6),
+           deaths_pm = round(total_deaths / population * 1e+6)) %>% 
+    ungroup()
+
+
+
+evolution %>%
+    plot_ly(x         = ~ deaths_pm,
+            y         = ~ cases_pm,
+            color     = ~ continent,
+            size      = ~ population,
+            hoverinfo = 'text',
+            text      = ~ location) %>%
+    add_text(x = 45,
+             y = 500,
+             text = ~ paste0('week: ', week),
+             frame = ~ week,
+             textfont = list(size = 150,
+                             color = toRGB('gray80'),
+                             opacity = .5),
+             showlegend = FALSE) %>%
+    add_markers(frame  = ~ week,
+                ids    = ~ location,
+                marker = list(showmode = 'diameter',
+                              showref = 0.9)) %>%
+    layout(xaxis = list(type = 'log',
+                        range = c(0, 3.25),
+                        title = 'Total Deaths per Million'),
+           yaxis = list(title = 'Total Cases per Million',
+                        type = 'log',
+                        range = c(0, 5.1)),
+           title = 'Total Cases & Total Deaths per Million') %>%
+    animation_opts(frame      = 500,
+                   transition = 500) %>%
+    animation_slider(hide = TRUE)
+
+```
+
+```{r}
+week_new_cases <- evolution %>% 
+    select(week, location, new_cases) %>% 
+    mutate(new_cases_week = paste0('new_cases_week_', week)) %>% 
+    select(- week) %>% 
+    spread(new_cases_week, new_cases, fill = 0) %>% 
+    arrange(location)
+
+week_positive_rate <- evolution %>% 
+    select(week, location, positive_rate) %>% 
+    mutate(positive_rate_week = paste0('positive_rate_week_', week)) %>% 
+    select(- week) %>% 
+    spread(positive_rate_week, positive_rate, fill = 0) %>% 
+    arrange(location)
+
+week_new_deaths <- evolution %>% 
+    select(week, location, new_deaths) %>% 
+    mutate(new_deaths_week = paste0('new_deaths_week_', week)) %>% 
+    select(- week) %>% 
+    spread(new_deaths_week, new_deaths, fill = 0) %>% 
+    arrange(location)
+
+
+cd_tidy <- week_new_cases %>% 
+    bind_cols(week_positive_rate %>% select(-location)) %>% 
+    bind_cols(week_new_deaths %>% select(-location))
+
+cd_tidy
+```
+
+```{r}
+require(embed)
+require(tidymodels)
+
+cd_recipe <- recipe(~., data = cd_tidy) %>%
+    update_role(location, new_role = 'id') %>% 
+    step_zv(all_numeric()) %>% 
+    #step_normalize(all_predictors()) %>% 
+    step_umap(all_predictors())
+
+cd_prep <- prep(cd_recipe)
+
+cd_bake <- bake(cd_prep, new_data = NULL)
+
+
+
+country_info <- covid_data %>% 
+    select(location, continent, population) %>% 
+    distinct() %>% 
+    arrange(location)
+    
+
+cd_final <- cd_bake %>% 
+    left_join(country_info, by = 'location')
+```
+
+
+
+
+```{r}
+require(highcharter)
+
+
+withinss <- tibble(
+  center = 1:15,
+  soq = map_dbl(1:15, ~ kmeans(cd_final %>% select(umap_1, umap_1), centers = .x)$tot.withinss)
+)
+
+hchart(withinss, 'line', hcaes(x = center, y = soq))
+
+
+clusters <- kmeans(cd_final %>% select(umap_1, umap_2), centers = 4)
+
+
+
+
+
+cd_final %<>% 
+    mutate(cluster = paste0('cluster_', clusters$cluster))
+
+cd_final %>% 
+    plot_ly(x = ~ umap_1,
+            y = ~ umap_2, 
+            color = ~ cluster) %>% 
+    add_markers(hoverinfo = 'text',
+                text = ~ location,
+                symbol = ~ continent)
+
+cd_final %>% 
+    hchart('scatter',
+           hcaes(x = umap_1,
+                 y = umap_2,
+                 group = continent,
+                 color = cluster,
+                 size = population / max(population)),
+           showInLegend = FALSE) %>% 
+    hc_yAxis(
+    title = list(text = "y Axis at right"),
+    opposite = TRUE,
+    alternateGridColor = "#FAFAFA",
+    minorTickInterval = "auto",
+    minorGridLineDashStyle = "LongDashDotDot",
+    showFirstLabel = TRUE,
+    showLastLabel = TRUE
+      )
+     
+
+
+```
+
+```{r}
+ggplot(iris) +
+    aes(Sepal.Length, Sepal.Width, color = Species) +
+    geom_point()
+
+iris %>% 
+    plot_ly(x = ~ Sepal.Length, y = ~ Sepal.Width, color = ~ Species) %>% 
+    add_markers()
+```
+
+```{r}
+pacman::p_load(echarts4r)
+e_common(font_family = "helvetica", theme = NULL)
+
+
+cd_final %>% 
+    plot_ly(x = ~ umap_1,
+            y = ~ umap_2, 
+            color = ~ cluster) %>% 
+    add_markers(hoverinfo = 'text',
+                text = ~ location,
+                symbol = ~ continent)
+
+cd_final %>% 
+  e_chart(umap_1) %>%
+  e_scatter(umap_2,
+            name = 'Dimentional Reduction') %>% 
+  e_lm(umap_2 ~ umap_1, name = 'linear model',
+       config = list(formulaOn = 'end', method = 'linear')) %>% 
+  e_axis_labels(x = 'UMAP 1', y = 'UMAP 2') %>% 
+  e_title(text = 'Analysis of Dimentional Reduction',
+          subtext = 'UMAP') %>% 
+  e_x_axis(nameLocation = 'center',
+           splitArea = list(show = FALSE),
+           axisLabel = list(margin = 3),
+           axisPointer = list(
+             show = TRUE,
+             lineStyle = list(
+               color = '#000000',
+               width = 0.75,
+               type = 'dotted'
+             )
+           )) %>% 
+  e_y_axis(nameLocation = 'center',
+           splitArea = list(show = FALSE),
+           axisLabel = list(margin = 3),
+           axisPointer = list(
+             show = TRUE,
+             lineStyle = list(
+               color = '#000000',
+               width = 0.75,
+               type = 'dotted'
+             )
+           )) 
+  #e_tooltip()
+```
+
+```{r}
+n_bins <- 25
+
+cd_final %>% 
+  mutate(umap_1_cut = cut(umap_1, n_bins),
+         umap_2_cut = cut(umap_2, n_bins)) %>% 
+  count(umap_1_cut, umap_2_cut, cluster) %>%
+  group_by(cluster) %>% 
+  e_chart(x = umap_1_cut) %>% 
+  e_heatmap(umap_2_cut ,n) %>% 
+  e_visual_map(n) %>% 
+  e_title('Heat map')
+```
+
+```{r}
+pacman::p_load(nycflights13)
+flights <- nycflights13::flights
+
+flights %>% 
+  transmute(week = as.Date(cut(time_hour, "week")), dep_delay, origin) %>% 
+  group_by(origin, week) %>%
+  summarise(dep_delay = sum(dep_delay, na.rm = TRUE)) %>% 
+  e_charts(x = week) %>% 
+  e_datazoom(type = 'slider',
+             toolbox = FALSE,
+             bottom = -5) %>%
+  e_tooltip() %>% 
+  e_title('Departure delays by airport') %>% 
+  e_x_axis(week, axisPointer = list(show = TRUE)) %>% 
+  e_line(dep_delay)
+```
+
+```{r}
+my_scale <- function(x){
+  scales::rescale(x, to = c(5, 15))
+}
+
+iris %>% 
+    e_charts(Petal.Width) %>% 
+    e_scatter(Petal.Length, Sepal.Width, scale = my_scale) %>% 
+    e_x_axis(nameLocation = 'center',
+           splitArea = list(show = FALSE),
+           axisLabel = list(margin = 3),
+           axisPointer = list(
+             show = TRUE,
+             lineStyle = list(
+               color = '#000000',
+               width = 0.75,
+               type = 'dotted'
+             )
+           )) %>% 
+  e_y_axis(nameLocation = 'center',
+           splitArea = list(show = FALSE),
+           axisLabel = list(margin = 3),
+           axisPointer = list(
+             show = TRUE,
+             lineStyle = list(
+               color = '#000000',
+               width = 0.75,
+               type = 'dotted'
+             )
+           )) %>% 
+  e_tooltip()
+```
+
+```{r}
+covid_data %>%
+  select(date, location, new_cases) %>% 
+  filter(location == 'Chile') %>%
+  filter(lubridate::year(date) %in% c(2020, 2021)) %>% 
+  select(-location) %>% 
+  e_charts(date) %>% 
+  e_calendar(range = c('2020-03', '2021-04')) %>% 
+  e_heatmap(new_cases, coord_system = 'calendar') %>% 
+  e_visual_map(max = max(8000)) %>% 
+  e_tooltip()
+```
+
+```{r}
+covid_data %>%
+  select(date, location, new_deaths) %>% 
+  filter(location == 'Chile') %>%
+  filter(lubridate::year(date) %in% c(2020, 2021)) %>% 
+  select(-location) %>% 
+  e_charts(date) %>% 
+  e_calendar(range = c('2020-03', '2021-04'), dayLabel = list(firstDay = 1)) %>% 
+  e_heatmap(new_deaths, coord_system = 'calendar') %>% 
+  e_visual_map(max = max(200),
+               top = 'middle') %>% 
+  e_tooltip()
+```
+
