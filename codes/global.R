@@ -1,19 +1,16 @@
-pacman::p_load(tidyverse, 
-               shiny,
-               flexdashboard,
-               magrittr,
-               lubridate, 
-               janitor,
-               leaflet, 
-               slider,
-               scales,
-               rvest,
-               httr,
-               leaflet.extras,
-               sp, 
-               echarts4r)
-
-
+suppressPackageStartupMessages(require(tidyverse))
+suppressPackageStartupMessages(require(shiny))
+suppressPackageStartupMessages(require(flexdashboard))
+suppressPackageStartupMessages(require(magrittr))
+suppressPackageStartupMessages(require(lubridate))
+suppressPackageStartupMessages(require(janitor))
+suppressPackageStartupMessages(require(leaflet))
+suppressPackageStartupMessages(require(slider))
+suppressPackageStartupMessages(require(rvest))
+suppressPackageStartupMessages(require(httr))
+suppressPackageStartupMessages(require(leaflet.extras))
+suppressPackageStartupMessages(require(sp))
+suppressPackageStartupMessages(require(echarts4r))
 
 # Checking commits -------------------------------------------------------------
 

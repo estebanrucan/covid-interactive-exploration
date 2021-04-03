@@ -17,6 +17,7 @@ resource_files:
 - datasets/owid-covid-data.RDS
 - codes/global.R
 - codes/statics.RData
+- codes/walden.project.json
 ---
 
 ```{r setup, include=FALSE}
@@ -81,7 +82,7 @@ country_cases('2020-01-01', today) %>%
 Column {data-width=500}
 -----------------------------------------------------------------------
 
-### ### New cases in last month per continent Over the Time
+### New cases in last month per continent Over the Time
 
 ```{r}
 evolution_of_cases() %>%
@@ -432,11 +433,11 @@ renderEcharts4r({
 ```{r}
 renderEcharts4r({
   cs()$interval_covid_data %>% 
-    rename('Total Tests' = total_tests,
+    rename('Total Tests' = total_tests) %>% 
+    e_charts(x = date) %>% 
+    e_bar_('Total Tests', 
            itemStyle = list(color = '#bf8cff',
                             opacity = 0.7)) %>% 
-    e_charts(x = date) %>% 
-    e_bar_('Total Tests') %>% 
     e_tooltip(trigger = 'axis') %>% 
     e_axis_labels(x = 'Date',
                   y = 'Total Tests') %>% 
